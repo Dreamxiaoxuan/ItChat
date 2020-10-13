@@ -1,306 +1,941 @@
-# itchat
-
-[![Gitter][gitter-picture]][gitter] ![py27][py27] ![py35][py35] [English version][english-version]
-
-itchat是一个开源的微信个人号接口，使用python调用微信从未如此简单。
-
-使用不到三十行的代码，你就可以完成一个能够处理所有信息的微信机器人。
-
-当然，该api的使用远不止一个机器人，更多的功能等着你来发现，比如[这些][tutorial2]。
-
-该接口与公众号接口[itchatmp][itchatmp]共享类似的操作方式，学习一次掌握两个工具。
-
-如今微信已经成为了个人社交的很大一部分，希望这个项目能够帮助你扩展你的个人的微信号、方便自己的生活。
-
-## 安装
-
-可以通过本命令安装itchat：
-
-```python
-pip install itchat
-```
-
-## 简单入门实例
-
-有了itchat，如果你想要给文件传输助手发一条信息，只需要这样：
-
-```python
-import itchat
-
-itchat.auto_login()
-
-itchat.send('Hello, filehelper', toUserName='filehelper')
-```
-
-如果你想要回复发给自己的文本消息，只需要这样：
-
-```python
-import itchat
-
-@itchat.msg_register(itchat.content.TEXT)
-def text_reply(msg):
-    return msg.text
-
-itchat.auto_login()
-itchat.run()
-```
-
-一些进阶应用可以在下面的开源机器人的源码和进阶应用中看到，或者你也可以阅览[文档][document]。
-
-## 试一试
-
-这是一个基于这一项目的[开源小机器人][robot-source-code]，百闻不如一见，有兴趣可以尝试一下。
-
-由于好友数量实在增长过快，自动通过好友验证的功能演示暂时关闭。
-
-![QRCode][robot-qr]
-
-## 截屏
-
-![file-autoreply][robot-demo-file] ![login-page][robot-demo-login]
-
-## 进阶应用
-
-### 特殊的字典使用方式
-
-通过打印itchat的用户以及注册消息的参数，可以发现这些值都是字典。
-
-但实际上itchat精心构造了相应的消息、用户、群聊、公众号类。
-
-其所有的键值都可以通过这一方式访问：
-
-```python
-@itchat.msg_register(TEXT)
-def _(msg):
-    # equals to print(msg['FromUserName'])
-    print(msg.fromUserName)
-```
-
-属性名为键值首字母小写后的内容。
-
-```python
-author = itchat.search_friends(nickName='LittleCoder')[0]
-author.send('greeting, littlecoder!')
-```
-
-### 各类型消息的注册
-
-通过如下代码，微信已经可以就日常的各种信息进行获取与回复。
-
-```python
-import itchat, time
-from itchat.content import *
-
-@itchat.msg_register([TEXT, MAP, CARD, NOTE, SHARING])
-def text_reply(msg):
-    msg.user.send('%s: %s' % (msg.type, msg.text))
-
-@itchat.msg_register([PICTURE, RECORDING, ATTACHMENT, VIDEO])
-def download_files(msg):
-    msg.download(msg.fileName)
-    typeSymbol = {
-        PICTURE: 'img',
-        VIDEO: 'vid', }.get(msg.type, 'fil')
-    return '@%s@%s' % (typeSymbol, msg.fileName)
-
-@itchat.msg_register(FRIENDS)
-def add_friend(msg):
-    msg.user.verify()
-    msg.user.send('Nice to meet you!')
-
-@itchat.msg_register(TEXT, isGroupChat=True)
-def text_reply(msg):
-    if msg.isAt:
-        msg.user.send(u'@%s\u2005I received: %s' % (
-            msg.actualNickName, msg.text))
-
-itchat.auto_login(True)
-itchat.run(True)
-```
-
-### 命令行二维码
-
-通过以下命令可以在登陆的时候使用命令行显示二维码：
-
-```python
-itchat.auto_login(enableCmdQR=True)
-```
-
-部分系统可能字幅宽度有出入，可以通过将enableCmdQR赋值为特定的倍数进行调整：
-
-```python
-# 如部分的linux系统，块字符的宽度为一个字符（正常应为两字符），故赋值为2
-itchat.auto_login(enableCmdQR=2)
-```
-
-默认控制台背景色为暗色（黑色），若背景色为浅色（白色），可以将enableCmdQR赋值为负值：
-
-```python
-itchat.auto_login(enableCmdQR=-1)
-```
-
-### 退出程序后暂存登陆状态
-
-通过如下命令登陆，即使程序关闭，一定时间内重新开启也可以不用重新扫码。
-
-```python
-itchat.auto_login(hotReload=True)
-```
-
-### 用户搜索
-
-使用`search_friends`方法可以搜索用户，有四种搜索方式：
-1. 仅获取自己的用户信息
-2. 获取特定`UserName`的用户信息
-3. 获取备注、微信号、昵称中的任何一项等于`name`键值的用户
-4. 获取备注、微信号、昵称分别等于相应键值的用户
-
-其中三、四项可以一同使用，下面是示例程序：
-
-```python
-# 获取自己的用户信息，返回自己的属性字典
-itchat.search_friends()
-# 获取特定UserName的用户信息
-itchat.search_friends(userName='@abcdefg1234567')
-# 获取任何一项等于name键值的用户
-itchat.search_friends(name='littlecodersh')
-# 获取分别对应相应键值的用户
-itchat.search_friends(wechatAccount='littlecodersh')
-# 三、四项功能可以一同使用
-itchat.search_friends(name='LittleCoder机器人', wechatAccount='littlecodersh')
-```
-
-关于公众号、群聊的获取与搜索在文档中有更加详细的介绍。
-
-### 附件的下载与发送
-
-itchat的附件下载方法存储在msg的Text键中。
-
-发送的文件的文件名（图片给出的默认文件名）都存储在msg的FileName键中。
-
-下载方法接受一个可用的位置参数（包括文件名），并将文件相应的存储。
-
-```python
-@itchat.msg_register([PICTURE, RECORDING, ATTACHMENT, VIDEO])
-def download_files(msg):
-    msg.download(msg.fileName)
-    itchat.send('@%s@%s' % (
-        'img' if msg['Type'] == 'Picture' else 'fil', msg['FileName']),
-        msg['FromUserName'])
-    return '%s received' % msg['Type']
-```
-
-如果你不需要下载到本地，仅想要读取二进制串进行进一步处理可以不传入参数，方法将会返回图片的二进制串。
-
-```python
-@itchat.msg_register([PICTURE, RECORDING, ATTACHMENT, VIDEO])
-def download_files(msg):
-    with open(msg.fileName, 'wb') as f:
-        f.write(msg.download())
-```
-
-### 用户多开
-
-使用如下命令可以完成多开的操作：
-
-```python
-import itchat
-
-newInstance = itchat.new_instance()
-newInstance.auto_login(hotReload=True, statusStorageDir='newInstance.pkl')
-
-@newInstance.msg_register(itchat.content.TEXT)
-def reply(msg):
-    return msg.text
-
-newInstance.run()
-```
-
-### 退出及登陆完成后调用特定方法
-
-登陆完成后的方法需要赋值在`loginCallback`中。
-
-而退出后的方法需要赋值在`exitCallback`中。
-
-```python
-import time
-
-import itchat
-
-def lc():
-    print('finish login')
-def ec():
-    print('exit')
-
-itchat.auto_login(loginCallback=lc, exitCallback=ec)
-time.sleep(3)
-itchat.logout()
-```
-
-若不设置loginCallback的值，则将会自动删除二维码图片并清空命令行显示。
-
-## 常见问题与解答
-
-Q: 如何通过这个包将自己的微信号变为控制器？
-
-A: 有两种方式：发送、接受自己UserName的消息；发送接收文件传输助手（filehelper）的消息
-
-Q: 为什么我发送信息的时候部分信息没有成功发出来？
-
-A: 有些账号是天生无法给自己的账号发送信息的，建议使用`filehelper`代替。
-
-## 作者
-
-[LittleCoder][littlecodersh]: 构架及维护Python2 Python3版本。
-
-[tempdban][tempdban]: 协议、构架及日常维护。
-
-[Chyroc][Chyroc]: 完成第一版本的Python3构架。
-
-## 类似项目
-
-[youfou/wxpy][youfou-wxpy]: 优秀的api包装和配套插件，微信机器人/优雅的微信个人号API
-
-[liuwons/wxBot][liuwons-wxBot]: 类似的基于Python的微信机器人
-
-[zixia/wechaty][zixia-wechaty]: 基于Javascript(ES6)的微信个人账号机器人NodeJS框架/库
-
-[sjdy521/Mojo-Weixin][Mojo-Weixin]: 使用Perl语言编写的微信客户端框架，可通过插件提供基于HTTP协议的api接口供其他语言调用
-
-[HanSon/vbot][HanSon-vbot]: 基于PHP7的微信个人号机器人，通过实现匿名函数可以方便地实现各种自定义的功能
-
-[yaphone/itchat4j][yaphone-itchat4j]: 用Java扩展个人微信号的能力
-
-[kanjielu/jeeves][kanjielu-jeeves]: 使用springboot开发的微信机器人
-
-## 问题和建议
-
-如果有什么问题或者建议都可以在这个[Issue][issue#1]和我讨论
-
-或者也可以在gitter上交流：[![Gitter][gitter-picture]][gitter]
-
-当然也可以加入我们新建的QQ群讨论：549762872, 205872856
-
-[gitter-picture]: https://badges.gitter.im/littlecodersh/ItChat.svg
-[gitter]: https://gitter.im/littlecodersh/ItChat?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge
-[py27]: https://img.shields.io/badge/python-2.7-ff69b4.svg
-[py35]: https://img.shields.io/badge/python-3.5-red.svg
-[english-version]: https://github.com/littlecodersh/ItChat/blob/master/README_EN.md
-[itchatmp]: https://github.com/littlecodersh/itchatmp
-[document]: https://itchat.readthedocs.org/zh/latest/
-[tutorial2]: http://python.jobbole.com/86532/
-[robot-source-code]: https://gist.github.com/littlecodersh/ec8ddab12364323c97d4e36459174f0d
-[robot-qr]: http://7xrip4.com1.z0.glb.clouddn.com/ItChat%2FQRCode2.jpg?imageView/2/w/400/
-[robot-demo-file]: http://7xrip4.com1.z0.glb.clouddn.com/ItChat%2FScreenshots%2F%E5%BE%AE%E4%BF%A1%E8%8E%B7%E5%8F%96%E6%96%87%E4%BB%B6%E5%9B%BE%E7%89%87.png?imageView/2/w/300/
-[robot-demo-login]: http://7xrip4.com1.z0.glb.clouddn.com/ItChat%2FScreenshots%2F%E7%99%BB%E5%BD%95%E7%95%8C%E9%9D%A2%E6%88%AA%E5%9B%BE.jpg?imageView/2/w/450/
-[littlecodersh]: https://github.com/littlecodersh
-[tempdban]: https://github.com/tempdban
-[Chyroc]: https://github.com/Chyroc
-[youfou-wxpy]: https://github.com/youfou/wxpy
-[liuwons-wxBot]: https://github.com/liuwons/wxBot
-[zixia-wechaty]: https://github.com/zixia/wechaty
-[Mojo-Weixin]: https://github.com/sjdy521/Mojo-Weixin
-[HanSon-vbot]: https://github.com/hanson/vbot
-[yaphone-itchat4j]: https://github.com/yaphone/itchat4j
-[kanjielu-jeeves]: https://github.com/kanjielu/jeeves
-[issue#1]: https://github.com/littlecodersh/ItChat/issues/1
+试制
+Honor 8A（海外版）
+Jakarta-L23
+2G+32G 无维保
+铂光金
+移动2G 联通2G/3G/4G 电信4G（电信通话需开通VolTE）
+49元 
+ 
+量产
+Honor 9 Lite（海外版）
+Leland-L31A
+3G+32G 无维保
+幻夜黑、魅海蓝【颜色随机发放，介意勿拍】
+联通3G/2G部分频段
+40元 
+ 
+量产
+Honor 9 Lite（海外版）
+Leland-L31C
+4G+64G 无维保
+海鸥灰、魅海蓝【颜色随机发放，介意勿拍】
+联通3G/2G部分频段
+79元 
+ 
+量产
+Mate 20 Pro（UD）
+Laya-AL00E
+8G+512G 无维保
+亮黑色
+全网通
+2700元 
+ 
+量产
+Mate 20 Pro海外双卡 保时捷
+Laya-L29CP
+8G+256G 无维保
+玄黑
+移动4G/联通4G
+4000元 
+ 
+量产
+Mate 20X 4G
+Ever-AL60C
+6G+128G 无维保
+宝石蓝、幻影银【颜色随机发放，介意勿拍】
+全网通
+1600元 
+ 
+量产
+Mate XS
+Tahiti-AN00DX
+8G+512G 有维保
+星际蓝
+全网通
+13999元 
+ 
+量产
+P10 lite 海外双卡
+Warsaw-L22J
+3G+32G 无维保
+铂光金、幻夜黑、魅海蓝、珍珠白【颜色随机发放，介意勿拍】
+联通3G/2G;移动2G;电信不支持
+50元 
+ 
+量产
+P10 Plus
+Vicky-AL00B
+6G+128G 无维保
+曜石黑
+全网通
+1200元 
+ 
+量产
+P10海外单卡-裸机（无充电器、无数据线、无耳机）
+Victoria-L09B
+4G+64G 无维保
+流光金
+移动联通234G；不支持电信
+299元 
+ 
+量产
+P20 Pro海外双卡（购机赠送随机款式保护套1个）
+Charlotte-L29C
+6G+128G 无维保
+宝石蓝
+移动联通234G；不支持电信
+1700元 
+ 
+试制
+P30 Pro海外单卡
+VOGUE-L09Cm
+8G+128G 无维保
+亮黑色
+移动联通234G；不支持电信
+2200元 
+ 
+量产
+P30 Pro海外单卡
+VOGUE-L04D
+8G+256G 无维保
+极光色
+移动联通234G；不支持电信
+2400元 
+ 
+量产
+P30 Pro海外双卡
+VOGUE-L29D
+8G+256G 无维保
+赤茶橘、天空之境【颜色随机发放，介意勿拍】
+移动联通234G；不支持电信
+2400元 
+ 
+试制
+P30 Pro海外双卡
+VOGUE-L29Dm
+8G+256G 无维保
+亮黑色
+移动联通234G；不支持电信
+2400元 
+ 
+量产
+P30 Pro海外双卡
+VOGUE-L29E
+8G+512G 无维保
+赤茶橘
+移动联通234G；不支持电信
+2900元 
+ 
+试制
+P30海外单卡
+ELLE-L09Bm
+6G+128G 无维保
+亮黑色
+移动联通234G；不支持电信
+1800元 
+ 
+试制
+P30海外双卡
+ELLE-L29A
+6G+64G 无维保
+深蓝色、紫色【颜色随机发放，介意勿拍】
+移动联通234G；不支持电信
+1550元 
+ 
+试制
+P30海外双卡
+ELLE-L29Bm
+6G+128G 无维保
+亮黑色
+移动联通234G；不支持电信
+1800元 
+ 
+试制
+P30海外双卡
+ELLE-L29Cm
+8G+128G 无维保
+亮黑色
+移动联通234G；不支持电信
+2000元 
+ 
+量产
+P9联通定制
+EVA-DL00
+3G+32G 无维保
+钛灰银
+全网通
+200元 
+ 
+试制
+Y5 2019（海外版）
+Amman-L03B
+2G+32G 无维保
+琥珀棕、摩登黑【颜色随机发放，介意勿拍】
+移动2G；联通2G/3G/4G
+49元 
+ 
+试制
+Y5 2019（海外版）
+Amman-L29B
+2G+32G 无维保
+宝石蓝、幻夜黑【颜色随机发放，介意勿拍】
+移动2G 联通2G/3G/4G
+49元 
+ 
+试制
+Y6 2019（海外版）
+Madrid-L03X
+2G+32G 无维保
+琥珀棕
+联通2G/3G/4G
+49元 
+ 
+试制
+Y6 2019（海外版）
+Madrid-L41A
+2G+32G 无维保
+摩登黑
+移动2G 联通2G/3G/4G
+49元 
+ 
+试制
+Y6s（海外版）
+Jakarta-L41BHW
+3G+32G 无维保
+芳草蓝
+移动2G 联通2G/3G/4G
+69元 
+ 
+量产
+Y7 2019（海外版）
+Dubai-L21B
+4G+64G 无维保
+极光紫
+移动2G 联通2G/3G/4G
+99元 
+ 
+量产
+Y7 2019（海外版）
+Dubai-L22C
+4G+64G 无维保
+极光紫
+移动2G 联通2G/3G/4G
+99元 
+ 
+量产
+畅享10
+Arthur-AL00BX
+4G+64G 无维保
+幻夜黑、极光蓝、天空之境【颜色随机发放，介意勿拍】
+全网通
+400元 
+ 
+量产
+畅享10
+Arthur-AL00CX
+4G+128G 无维保
+幻夜黑、极光蓝、天空之境、相思红【颜色随机发放，介意勿拍】
+全网通
+550元 
+ 
+量产
+畅享10
+Arthur-AL00CY
+4G+128G 无维保
+极光蓝
+全网通
+550元 
+ 
+量产
+畅享10
+Arthur-AL00DX
+6G+64G 无维保
+幻夜黑、极光蓝、相思红【颜色随机发放，介意勿拍】
+全网通
+550元 
+ 
+量产
+畅享10
+Arthur-AL00EX
+6G+128G 无维保
+幻夜黑、极光蓝、天空之境、相思红【颜色随机发放，介意勿拍】
+全网通
+560元 
+ 
+量产
+畅享10
+Arthur-AL00EY
+6G+128G 无维保
+极光蓝、天空之境、相思红【颜色随机发放，介意勿拍】
+全网通
+560元 
+ 
+量产
+畅享10e
+Merida-AL00B
+4G+64G 无维保
+翡冷翠、幻夜黑、珍珠白【颜色随机发放，介意勿拍】
+全网通
+440元 
+ 
+量产
+畅享10e
+Merida-AL20DX
+4G+128G 无维保
+翡冷翠、幻夜黑、珍珠白【颜色随机发放，介意勿拍】
+全网通
+470元 
+ 
+量产
+畅享9
+Dubai-AL20B
+4G+64G 无维保
+幻夜黑、极光紫【颜色随机发放，介意勿拍】
+全网通
+250元 
+ 
+量产
+荣耀10 青春版
+Harry-AL10B
+4G+64G 无维保
+幻夜黑
+全网通
+400元 
+ 
+量产
+荣耀8 青春版
+Prague-AL00A
+3G+32G 无维保
+魅海蓝、珠光白【颜色随机发放，介意勿拍】
+全网通
+55元 
+ 
+量产
+荣耀8 青春版
+Prague-AL00B
+4G+32G 无维保
+珠光白
+全网通
+65元 
+ 
+量产
+荣耀8 青春版
+Prague-AL00C
+4G+64G 无维保
+魅海蓝
+全网通
+85元 
+ 
+量产
+荣耀9X
+Hulk-AL00D
+6G+128G 无维保
+幻夜黑、魅焰红【颜色随机发放，介意勿拍】
+全网通
+800元 
+ 
+量产
+荣耀Play3
+Asoka-AL00AX
+4G+64G 无维保
+冰岛白、幻夜黑、极光蓝、魅焰红【颜色随机发放，介意勿拍】
+全网通
+400元 
+ 
+试制
+荣耀Play3
+Asoka-AL00DX1
+6G+128G 无维保
+极光蓝
+全网通
+490元 
+ 
+量产
+荣耀Play4T
+Asoka-AL10A
+6G+128G 无维保
+幻夜黑、极光蓝、蓝水翡翠【颜色随机发放，介意勿拍】
+全网通
+550元 
+ 
+量产
+荣耀畅玩7
+Dura-AL00A
+2G+16G 无维保
+黑色、金色、蓝色【颜色随机发放，介意勿拍】
+全网通
+30元 
+==============================
+量产
+256G存储卡
+CF22
+256G 无维保
+黑色
+299元 
+ 
+量产
+FreeBuds 2 Pro无线耳机-华为/荣耀混发
+CM-H2
+无维保
+黑色、白色、红色、蓝色【颜色随机发放，介意勿拍】
+199元 
+ 
+量产
+FreeBuds 2无线耳机-华为/荣耀混发
+CM-H2S
+无维保
+黑色、白色、红色、蓝色【颜色随机发放，介意勿拍】
+169元 
+ 
+量产
+HUAWEI FreeBuds 3 无线耳机-无线充版本-韩国版本
+CM-H-Shark
+有维保
+陶瓷白
+699元 
+ 
+量产
+HUAWEI 三脚架自拍杆 无线版
+AF15
+无维保
+白色
+49元 
+ 
+量产
+HUAWEI 英规10V4A充电器（内附一根5A快充线，买一赠一40W快充中规充电头）
+CP84
+无维保
+白色
+29元 
+ 
+量产
+HUAWEI 有线三脚架自拍杆
+AF14
+无维保
+黑色
+29元 
+ 
+试制
+OSMO MOBILE灵眸手机云台3
+CF35
+无维保
+灰
+399元 
+ 
+量产
+大礼包（内含HUAWEI 15W无线充1pcs+128G NM存储卡1张）
+CP60-大礼包
+无维保
+白色
+99元 
+ 
+量产
+华为 FreeBuds 悦享版 无线耳机
+CM-H1C
+无维保
+陶瓷白
+129元 
+ 
+试制
+华为 FreeLace 无线耳机-海外版
+CM70-C
+无维保
+黑
+129元 
+ 
+量产
+华为 车载充电器 快充版
+CP31
+无维保
+黑色
+30元 
+ 
+量产
+华为mini蓝牙音箱
+CM510
+无维保
+曜石黑
+69元 
+ 
+量产
+华为便携照片打印机专用打印纸（买一赠一）
+CV80z
+无维保
+白色
+9元 
+ 
+量产
+华为运动蓝牙耳机
+AM60
+无维保
+黑色
+99元 
+ 
+量产
+无线充电器 15W（Max）
+CP60
+无维保
+白色
+49元 
+=====================================================
+试制
+HUAWEI WATCH GT 2 时尚款 42mm
+Diana-B19H
+无维保
+栗木红
+蓝牙
+700元 
+ 
+试制
+HUAWEI WATCH GT 2 时尚款 42mm
+Diana-B19J
+无维保
+凝霜白
+蓝牙
+700元 
+ 
+量产
+HUAWEI WATCH GT 活力款
+Fortuna-B19R
+无维保
+钛灰色
+蓝牙
+300元 
+ 
+量产
+HUAWEI WATCH GT 雅致款（已刷成国内版本）
+Ella-B19P
+无维保
+钢色
+蓝牙
+400元 
+ 
+量产
+华为儿童手表 3s
+Nemo-AL10-冰山蓝
+无维保
+冰山蓝
+移动：支持4G 联通：支持4G 电信：支持4G
+300元 
+ 
+量产
+华为儿童手表 3s
+Nemo-AL10-蜜桃粉
+无维保
+蜜桃粉
+移动：支持4G 联通：支持4G 电信：支持4G
+300元 
+ 
+量产
+华为儿童手表 3X
+Alex-AL10
+无维保
+月光白
+移动：支持4G 联通：支持4G 电信：支持4G
+400元 
+ 
+试制
+华为手环3 海外版
+Terra-B09
+无维保
+极光蓝
+蓝牙
+60元 
+ 
+量产
+华为通话手环B3 青春版
+Grus-B09
+无维保
+黑色
+蓝牙
+40元 
+ 
+量产
+华为通话手环B5 商务版
+Janus-B19
+无维保
+摩卡棕
+蓝牙
+300元 
+ 
+量产
+华为通话手环B5 运动版
+Janus-B09
+无维保
+铅石青、韵律黑【颜色随机发放，介意勿拍】
+蓝牙
+200元 
+ 
+量产
+荣耀手环3 NFC版
+NYX-B20HN
+无维保
+深空黑
+蓝牙
+40元 
+ 
+量产
+荣耀手环3 标准版
+NYX-B10HN
+无维保
+深空黑
+蓝牙
+20元 
+ 
+量产
+荣耀手环4 标准版
+Crius-B19
+无维保
+珊瑚粉、午夜蓝、陨石黑【颜色随机发放，介意勿拍】
+蓝牙
+60元 
+========================================
+量产
+HUAWEI MatePad Pro 10.8英寸
+Marx-W09B
+6G+128G 无维保
+仅WIFI
+2092元 
+ 
+量产
+HUAWEI MatePad Pro 10.8英寸
+Marx-AL09B
+6G+128G 无维保
+全网通
+2429元 
+ 
+量产
+HUAWEI MatePad Pro 10.8英寸
+Marx-AL09D
+8G+256G 无维保
+全网通
+2900元 
+ 
+量产
+MateBook E 12英寸
+Planck-AL09C
+8G+256G 无维保
+全网通
+2140元 
+ 
+量产
+MateBook E 12英寸
+Planck-AL09D
+8G+512G 无维保
+全网通
+2677元 
+ 
+量产
+华为畅享平板 10英寸
+Agassi2-W09B
+3G+32G 无维保
+仅WIFI
+287元 
+ 
+量产
+华为平板M3 8英寸
+Beethoven-DL09B-【3G+64G】
+3G+64G 无维保
+全网通
+235元 
+ 
+量产
+华为平板M3 8英寸
+Beethoven-DL09B
+4G+64G 无维保
+全网通
+262元 
+ 
+量产
+华为平板M3 8英寸【海外版】
+Beethoven-DL09B-海外版
+4G+64G 无维保
+支持WiFi，移动&联通双4G
+223元 
+ 
+量产
+华为平板M3 青春版 8英寸【海外版】
+Chopin-W09B
+3G+32G 无维保
+仅WIFI
+109元 
+ 
+量产
+华为平板M3 青春版 8英寸【海外版】
+Chopin-L09B
+3G+32G 无维保
+支持WiFi，移动&联通双4G
+128元 
+ 
+量产
+华为平板M3青春版 10.1英寸【海外版】
+Bach-W09B
+3G+32G 无维保
+仅WIFI
+136元 
+ 
+量产
+华为平板M5 青春版 8英寸【海外版】
+Jordan2-L59B
+3G+32G 无维保
+仅WIFI
+315元 
+ 
+量产
+荣耀Waterplay 10英寸【海外版】
+Haydn-W09A
+3G+32G 无维保
+仅WIFI
+143元 
+==================================
+量产
+Q2 Pro（1母1子）
+WS5280-11（1拖1）
+无维保
+白色
+400元 
+ 
+量产
+Q2 Pro（1母2子）
+WS5280-11（1拖2）
+无维保
+白色
+500元 
+ 
+量产
+Q2 pro（单母）
+WS5280-11（单母）
+无维保
+白色
+225元 
+ 
+量产
+WS5200增强版
+WS5200-11
+无维保
+白色
+102元 
+ 
+量产
+华为备咖存储
+ST310-S1
+无维保
+灰色
+250元 
+ 
+试制
+华为路由Q2S（1拖1）
+WS5281-10（1拖1）
+无维保
+白色
+319元 
+ 
+量产
+华为路由TC5200
+TC5200-11
+无维保
+白色
+64元 
+ 
+试制
+华为路由WS5106
+WS5106-10
+无维保
+黑色
+76元 
+ 
+量产
+华为路由WS5200
+WS5200-10
+无维保
+白色
+75元 
+ 
+量产
+荣耀X3 Pro
+CD35-10
+无维保
+白色
+83元 
+ 
+量产
+荣耀备咖存储
+ST320-S1
+无维保
+白色
+250元 
+ 
+量产
+荣耀猎人路由器
+HiRouter-CT31-10
+无维保
+机甲灰
+287元 
+ 
+量产
+荣耀路由2
+HiRouter-CD20-10
+无维保
+白色
+50元 
+ 
+量产
+荣耀路由3
+XD20-10
+无维保
+白色
+140元 
+ 
+量产
+荣耀路由CD28
+CD28 V2
+无维保
+白色
+48元 
+ 
+量产
+荣耀路由Pro2
+HiRouter-CD30-10
+无维保
+白色
+127元 
+======================
+量产
+HUAWEI MateBook 13
+Wright-W09B
+i3 8G+256G 集显 非触屏 无维保
+通用PC
+1950元 
+ 
+量产
+HUAWEI MateBook 13
+Heng-W19BR
+R5 8G+512G 集显 非触屏 无维保
+通用PC
+2834元 
+ 
+量产
+HUAWEI MateBook 13
+Heng-W19CR
+R5 16G+512G 集显 非触屏 无维保
+通用PC
+3098元 
+ 
+量产
+HUAWEI MateBook 14
+Kelvin-W19D
+i5 8G+512G 独显 非触屏 无维保
+通用PC
+3341元 
+ 
+量产
+HUAWEI MateBook 14
+Kelvin-W29C
+i7 8G+512G 独显 非触屏 无维保
+通用PC
+4265元 
+ 
+量产
+HUAWEI MateBook D 14英寸
+NobelK-WAQ9BR
+R5 8G+512G 集显 非触屏 无维保
+通用PC
+2763元 
+ 
+量产
+HUAWEI MateBook D 15.6英寸
+BohrK-WAQ9BRP
+R5 16G+512G 集显 非触屏 无维保
+通用PC
+3198元 
+ 
+量产
+Magicbook 14英寸
+Kepler-W00B
+R5 8G+256G 集显 非触屏 无维保
+通用PC
+1493元 
+ 
+量产
+MateBook 13
+Wright-W19E
+i5 8G+512G 独显 非触屏 无维保
+通用PC
+2894元 
+ 
+量产
+MateBook 13
+Wright-W19G
+i5 8G+512G 独显 非触屏 无维保
+通用PC
+2894元 
+ 
+量产
+MateBook 13
+Wright-W29E
+i7 8G+512G 独显 非触屏 无维保
+通用PC
+3433元 
+ 
+量产
+MateBook 13
+Wright-W29F
+i7 8G+512G 独显 非触屏 无维保
+通用PC
+3433元 
+ 
+量产
+MateBook 14
+KelvinC-WFE9A
+i7 16G+512G 独显 触屏 无维保
+通用PC
+5940元 
+ 
+量产
+MateBook X pro 13.9英寸
+Mach-W19B
+i5 8G+256G 集显 触屏 无维保
+通用PC
+3527元 
+ 
+量产
+MateBook X pro 13.9英寸
+Mach-W29B
+i7 8G+256G 独显 触屏 无维保
+通用PC
+4814元 
+ 
+量产
+MateBook X pro 13.9英寸
+Mach-W29C
+i7 16G+512G 独显 触屏 无维保
+通用PC
+6434元 
+ 
+量产
+MateBook X pro 2019 13.9英寸
+MachR-W19B
+i5 8G+512G 集显 触屏 无维保
+通用PC
+4970元 
+ 
+量产
+MateBook X pro 2019 13.9英寸
+MachR-W19C
+i5 8G+512G 独显 触屏 无维保
+通用PC
+5648元 
+ 
+量产
+MateBook X pro 2019 13.9英寸
+MachR-W29B
+i7 8G+512G 独显 触屏 无维保
+通用PC
+6326元 
+ 
+量产
+荣耀 MagicBook Pro 16.1英寸
+Hubble-W09A
+i3 8G+256G 集显 非触屏 无维保
+通用PC
+2510元 
